@@ -1,0 +1,43 @@
+{
+  "name": "ask-RetailCo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Ask RetailCo – internal AI assistant for store and head office staff, built on Microsoft Rayfin (BaaS on Fabric).",
+  "scripts": {
+    "predev": "rayfin env --framework vite",
+    "prebuild": "rayfin env --framework vite",
+    "dev": "rayfin up --exclude-services staticHosting && vite",
+    "dev:local": "npm run predev && npm run rayfin:dev && vite",
+    "dev:local:stop": "cross-env RAYFIN_FEATURE_FLAGS=docker-local-dev RAYFIN_WEBSERVICE_IMAGE_NAME=ghcr.io/microsoft/rayfin/webservice:latest rayfin dev --stop",
+    "dev:local:down": "cross-env RAYFIN_FEATURE_FLAGS=docker-local-dev RAYFIN_WEBSERVICE_IMAGE_NAME=ghcr.io/microsoft/rayfin/webservice:latest rayfin dev --down",
+    "dev:local:purge": "cross-env RAYFIN_FEATURE_FLAGS=docker-local-dev RAYFIN_WEBSERVICE_IMAGE_NAME=ghcr.io/microsoft/rayfin/webservice:latest rayfin dev --purge",
+    "up": "rayfin up",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "rayfin:dev": "cross-env RAYFIN_FEATURE_FLAGS=docker-local-dev RAYFIN_WEBSERVICE_IMAGE_NAME=ghcr.io/microsoft/rayfin/webservice:latest rayfin dev",
+    "rayfin:db": "cross-env RAYFIN_FEATURE_FLAGS=docker-local-dev RAYFIN_WEBSERVICE_IMAGE_NAME=ghcr.io/microsoft/rayfin/webservice:latest rayfin dev db apply",
+    "seed": "tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "@microsoft/rayfin-auth-provider-fabric": "^1.33.1",
+    "@microsoft/rayfin-client": "^1.33.1",
+    "@microsoft/rayfin-core": "^1.33.1",
+    "@microsoft/rayfin-data": "^1.33.1",
+    "@tailwindcss/vite": "^4.1.11",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.1"
+  },
+  "devDependencies": {
+    "@microsoft/rayfin-cli": "^1.33.1",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react-swc": "^4.2.2",
+    "cross-env": "^10.1.0",
+    "tailwindcss": "^4.1.11",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3",
+    "vite": "^7.3.2"
+  }
+}

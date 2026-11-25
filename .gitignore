@@ -1,0 +1,18 @@
+node_modules
+dist
+.vite
+.env
+.env.local
+.rayfin
+*.log
+.DS_Store
+# Local secrets, build state and deployment artifacts (not for publishing)
+.env
+.env.local
+rayfin/.env*
+rayfin/.deployments.json
+rayfin/.temp/
+*.tsbuildinfo
+*.log
+.fabric/deployment.json
+DEPLOYMENT_STATUS.md
