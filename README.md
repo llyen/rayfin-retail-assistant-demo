@@ -1,52 +1,113 @@
-# Ask RetailCo (retail AI assistant demo)
+# Ask RetailCo — wewnętrzny asystent (Rayfin demo)
 
-An "Ask Me Anything" demo assistant for staff of RetailCo, a fictional chain of DIY and garden stores (store staff, store managers, head office), built on Rayfin (backend-as-a-service on Microsoft Fabric). The UI is in Polish.
+Wersja angielska: [README.en.md](README.en.md).
 
-Polish version: [README.pl.md](README.pl.md).
+Aplikacja typu "Ask Me Anything" dla pracowników RetailCo, fikcyjnej sieci marketów budowlano-ogrodniczych (sklep, kierownik, centrala),
+zbudowana na **Microsoft Rayfin** (Backend-as-a-Service na Microsoft Fabric).
 
-## What it does
+- Auth: email/hasło (lokalnie) lub Microsoft Entra SSO (Fabric).
+- Encje (`rayfin/data/`): `KnowledgeDoc`, `Conversation`, `Message`, `Feedback`.
+- RLS: każdy zalogowany czyta bazę wiedzy; rozmowy i feedback widzi tylko autor.
+- RAG: keyword search po `KnowledgeDoc` (client-side BM25-lite), z hookiem do
+  wymiany na hybrid search w OneLake (Rayfin Functions — TODO).
+- LLM: Azure OpenAI (jeśli skonfigurowane w `.env.local`); w przeciwnym razie
+  deterministyczny **mock** zwracający fragmenty bazy wiedzy.
 
-- Sign-in with email/password (local backend) or Microsoft Entra ID via Fabric.
-- Chat with answers grounded in a small knowledge base. Retrieval is a client-side BM25-like keyword search over `KnowledgeDoc`.
-- Answers come from Azure OpenAI if it is configured in `.env.local`. Otherwise a deterministic mock returns fragments of the knowledge base.
-- Conversations, messages with citations, and thumbs up/down feedback are stored per user.
-- A knowledge base page with create, edit and delete for documents.
-- On first sign-in the app seeds five sample documents (leave requests, seasonal display, workwear, health and safety, store opening).
+## Stos
 
-Entities in `rayfin/data/`: `KnowledgeDoc`, `Conversation`, `Message`, `Feedback`. Every signed-in user can read the knowledge base; conversations and feedback are visible only to their author.
+React 19 + Vite 7 + TailwindCSS v4, TypeScript, `@microsoft/rayfin-client`.
 
-## Stack
+## Szybki start (lokalnie, bez Fabric)
 
-React 19, Vite 7, Tailwind CSS 4, TypeScript, `@microsoft/rayfin-client`.
-
-## Running locally
-
-Requirements: Node.js 20+, Docker Desktop.
+Wymagania: Node 20+, Docker Desktop (do `rayfin dev`).
 
 ```bash
-npm ci
-cp .env.example .env.local     # optional: Azure OpenAI settings
-npm run rayfin:db              # apply the schema (starts the containers)
-npm run dev:local              # backend in Docker + Vite on http://localhost:5173
+npm install
+cp .env.example .env.local          # opcjonalnie wpisz klucze Azure OpenAI
+npm run rayfin:db                   # pierwsza migracja schematu (uruchomi też kontenery)
+npm run dev:local                   # backend w Dockerze + Vite na http://localhost:5173
 ```
 
-## Deploying to Microsoft Fabric
+Pierwsze logowanie: dowolny email + hasło (Rayfin tworzy konto w trybie
+`password.enabled: true`). Po zalogowaniu aplikacja **auto-seeduje** 5
+przykładowych dokumentów (urlopy, ekspozycja sezonowa, strój roboczy, BHP, otwarcie sklepu).
+
+### Stop / czyszczenie
 
 ```bash
-npx rayfin login -t <TENANT_ID>
-npm run up
+npm run dev:local:stop      # zatrzymaj kontenery (dane zostają)
+npm run dev:local:down      # usuń kontenery (volumes zostają)
+npm run dev:local:purge     # pełny reset
 ```
 
-After the first deployment add the app URL to `allowedRedirectUris` in `rayfin/rayfin.yml` if the CLI has not done it.
+## Deploy na Microsoft Fabric
 
-## Security note
+```bash
+npm run up                  # rayfin up — provisioning + deploy
+```
 
-In this demo the Azure OpenAI key, if set, is read in the browser (`VITE_*` variables). Do not do this in production. Move the call to a server-side function and keep the key there.
+Wymaga workspace Fabric i zalogowania CLI. Po wdrożeniu:
+- dane (KnowledgeDoc, Conversation, Message, Feedback) lądują w OneLake,
+- governance, RLS i audyt dziedziczone z Fabric,
+- frontend hostowany jako StaticApp (`staticHosting.enabled: true`).
 
-## Disclaimer
+## Konfiguracja Azure OpenAI (opcjonalnie)
 
-RetailCo is a fictional company. The sample documents are invented. This is a demo, not a production system, and not an official Microsoft product.
+W `.env.local`:
 
-## License
+```
+VITE_AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com
+VITE_AZURE_OPENAI_KEY=<key>
+VITE_AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini
+VITE_AZURE_OPENAI_API_VERSION=2024-10-21
+```
 
-MIT, see [LICENSE](LICENSE).
+⚠️ W produkcji **nie wystawiamy klucza Azure OpenAI z frontu** — przenieś
+wywołanie do Rayfin Functions (sekcja `services.functions` w `rayfin.yml`)
+i trzymaj sekrety po stronie serwisu.
+
+## Struktura
+
+```
+rayfin/
+  rayfin.yml                # services: auth + data (mssql) + staticHosting
+  data/
+    KnowledgeDoc.ts         # dokumenty FAQ / procedur / polityk
+    Conversation.ts         # rozmowy użytkownika
+    Message.ts              # wiadomości w rozmowie (+ citations JSON)
+    Feedback.ts             # 👍/👎 + komentarz
+    schema.ts               # schemat dla typed clienta
+src/
+  main.tsx, App.tsx
+  hooks/AuthContext.tsx
+  services/
+    bootstrap.ts            # init Rayfin clienta z env
+    rayfinClient.ts         # singleton
+    knowledge.ts            # CRUD KnowledgeDoc
+    conversations.ts        # CRUD Conversation
+    messages.ts             # CRUD Message (citations JSON ↔ array)
+    feedback.ts             # CRUD Feedback
+    retrieval.ts            # BM25-lite po stronie klienta (MVP)
+    llm.ts                  # ask() → Azure OpenAI / mock
+    seed.ts                 # auto-seed 5 dokumentów
+    errors.ts               # mapowanie AuthError → wylogowanie
+  components/
+    AuthPage.tsx, Sidebar.tsx, MessageBubble.tsx
+  pages/
+    ChatPage.tsx            # główny czat (auto-seed)
+    KnowledgePage.tsx       # CRUD bazy wiedzy
+```
+
+## Co by się przeniosło do produkcji
+
+1. **Retrieval** — z client-side BM25 na hybrid (BM25 + vector) w OneLake,
+   wywoływany przez Rayfin Function `searchKnowledge`.
+2. **LLM call** — przeniesione do Rayfin Function `ask`, klucz Azure OpenAI
+   trzymany jako secret, frontend nie zna kluczy.
+3. **Role** — dodać role `editor`/`admin` dla `KnowledgeDoc.update/delete`
+   zamiast policy "tylko autor".
+4. **RLS per region** — `claims.region.eq(item.region)`, żeby pracownik
+   widział tylko procedury swojego regionu i ogólne.
+5. **Feedback dashboard** — widok Fabric BI po `Feedback` × `Message`
+   (% pozytywnych, top tematy z 👎).
+```
